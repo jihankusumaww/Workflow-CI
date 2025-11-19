@@ -1,0 +1,15 @@
+artifact_uri: file:C:/Workflow-CI/MLProject/mlruns/0/b21fce7126f44130bb829b3e63172798/artifacts
+end_time: 1763568322995
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: b21fce7126f44130bb829b3e63172798
+run_name: stylish-moose-949
+run_uuid: b21fce7126f44130bb829b3e63172798
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1763568311009
+status: 3
+tags: []
+user_id: LENOVO

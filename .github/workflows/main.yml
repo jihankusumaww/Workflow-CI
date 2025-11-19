@@ -1,0 +1,129 @@
+name: CI/CD MLflow
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "MLProject/**"
+      - ".github/workflows/main.yml"
+
+env:
+  TRAIN_CSV: "C:\\Workflow-CI\\MLProject\\insurance_preprocessing\\insurance_train_preprocessed.csv"
+  TEST_CSV: "C:\\Workflow-CI\\MLProject\\insurance_preprocessing\\insurance_test_preprocessed.csv"
+  TARGET_VAR: "Status"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1) Checkout repository
+      - name: Run actions/checkout@v3
+        uses: actions/checkout@v3
+
+      # 2) Setup Python
+      - name: Set up Python 3.12.7
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.7"
+
+      # 3) Cek environment (opsional, buat debug)
+      - name: Check Env
+        run: |
+          echo "CSV_URL:  $CSV_URL"
+          echo "TARGET_VAR: $TARGET_VAR"
+          echo "PWD: $(pwd)"
+          ls
+
+      # 4) Install dependency untuk training & MLflow
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install \
+            mlflow==2.19.0 \
+            cloudpickle==3.1.1 \
+            numpy==2.3.4 \
+            pandas==2.3.3 \
+            pyarrow==18.1.0 \
+            scikit-learn==1.7.2 \
+            scipy==1.16.3 \
+            matplotlib
+
+      # 5) Set MLflow Tracking URI -> ABSOLUTE path ke root/mlruns
+      - name: Set MLflow Tracking URI (root-level mlruns)
+        run: |
+          ROOT_DIR=$(pwd)
+          echo "Using ROOT_DIR=$ROOT_DIR"
+          echo "MLFLOW_TRACKING_URI=file:${ROOT_DIR}/mlruns" >> $GITHUB_ENV
+          echo "Set MLFLOW_TRACKING_URI=file:${ROOT_DIR}/mlruns"
+
+      # 6) Run MLflow project (entry point: train)
+      - name: Run mlflow project
+        run: |
+          mlflow run MLProject --env-manager=local -e train \
+            -P test_size=0.2 \
+            -P n_estimators=150 \
+            -P max_depth=6 \
+            -P data_dir=MLProject/insurance_preprocessing
+
+      # 7) Ambil run_id TERBARU yang punya artifacts/model
+      - name: Get latest MLflow run_id
+        run: |
+          echo "Listing mlruns structure for debug:"
+          find mlruns -maxdepth 4 -type d -print || true
+
+          # cari direktori .../artifacts/model yang terbaru
+          RUN_DIR=$(ls -td mlruns/0/*/artifacts/model 2>/dev/null | head -n 1 || true)
+
+          if [ -z "$RUN_DIR" ]; then
+            echo "ERROR: Tidak menemukan folder mlruns/0/*/artifacts/model"
+            exit 1
+          fi
+
+          echo "Found model artifacts at: $RUN_DIR"
+
+          # path: mlruns/0/<RUN_ID>/artifacts/model  -> ambil <RUN_ID>
+          RUN_ID=$(echo "$RUN_DIR" | cut -d'/' -f3)
+
+          echo "RUN_ID=$RUN_ID" >> $GITHUB_ENV
+          echo "Latest run_id with model: $RUN_ID"
+
+      # 8) (Dummy) Step install Python deps — biar mirip contoh materi
+      - name: Install Python dependencies
+        run: |
+          echo "Dependencies sudah ter-install di langkah sebelumnya."
+
+      # 9) Upload folder mlruns sebagai artefak GitHub
+      - name: Upload to GitHub (artifact)
+        if: ${{ hashFiles('mlruns/**') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlruns
+          path: mlruns
+
+      # 10) Build Docker image dari model MLflow
+      - name: Build Docker Model
+        run: |
+          mlflow models build-docker \
+            --model-uri "runs:/$RUN_ID/model" \
+            --name "cc"
+
+      # 11) Login ke Docker Hub (pakai secrets)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 12) Tag Docker image lokal -> nama repo di Docker Hub
+      - name: Tag Docker Image
+        run: |
+          docker tag cc \
+            ${{ secrets.DOCKERHUB_USERNAME }}/cc:latest
+
+      # 13) Push Docker image ke Docker Hub
+      - name: Push Docker Image
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/cc:latest

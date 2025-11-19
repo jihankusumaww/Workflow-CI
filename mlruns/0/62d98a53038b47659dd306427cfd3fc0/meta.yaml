@@ -1,0 +1,15 @@
+artifact_uri: file:C:/Workflow-CI/MLProject/mlruns/0/62d98a53038b47659dd306427cfd3fc0/artifacts
+end_time: 1763568367846
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 62d98a53038b47659dd306427cfd3fc0
+run_name: nosy-grub-87
+run_uuid: 62d98a53038b47659dd306427cfd3fc0
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1763568355298
+status: 3
+tags: []
+user_id: LENOVO
