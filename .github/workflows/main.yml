@@ -106,6 +106,7 @@ jobs:
       # 10) Build Docker image dari model MLflow
       - name: Build Docker Model
         run: |
+          export MLFLOW_TRACKING_URI=file:${PWD}/mlruns
           mlflow models build-docker \
             --model-uri "runs:/$RUN_ID/model" \
             --name "cc"
